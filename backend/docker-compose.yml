@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: axis_postgres_dev
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: axis_db_user
+      POSTGRES_PASSWORD: axis_db_password
+      POSTGRES_DB: axis_training_calendar
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:

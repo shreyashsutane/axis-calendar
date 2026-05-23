@@ -1,0 +1,30 @@
+# macOS metadata files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Environment configuration (protects passwords and secrets)
+.env
+.env*.local
+
+# TypeScript compilation output
+backend/dist/
+
+# Expo / React Native cache & build files
+frontend/.expo/
+frontend/android/app/build/
+frontend/ios/build/
+frontend/.cache/
+frontend/web-build/
+*.apk
+*.ipa
+
+# System logs
+*.log
