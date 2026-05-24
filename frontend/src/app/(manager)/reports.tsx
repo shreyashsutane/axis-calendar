@@ -175,7 +175,7 @@ export default function ReportsDashboard() {
   const fetchAnalytics = async () => {
     if (!token || token === 'mock-jwt-token-xyz') return;
     try {
-      const response = await fetch('https://axis-calendar-backend-122036974660.us-central1.run.app/api/v1/reports/branch-completion', {
+      const response = await fetch('https://axis-calendar-backend.onrender.com/api/v1/reports/branch-completion', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const resJson = await response.json();
@@ -195,7 +195,7 @@ export default function ReportsDashboard() {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      const response = await fetch('https://axis-calendar-backend-122036974660.us-central1.run.app/api/v1/trainings', {
+      const response = await fetch('https://axis-calendar-backend.onrender.com/api/v1/trainings', {
         headers
       });
       const resJson = await response.json();
@@ -312,7 +312,7 @@ export default function ReportsDashboard() {
     }
 
     try {
-      const response = await fetch('https://axis-calendar-backend-122036974660.us-central1.run.app/api/v1/reports/team-attendance', {
+      const response = await fetch('https://axis-calendar-backend.onrender.com/api/v1/reports/team-attendance', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const resJson = await response.json();
@@ -349,7 +349,7 @@ export default function ReportsDashboard() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch('https://axis-calendar-backend-122036974660.us-central1.run.app/api/v1/trainings', {
+      const response = await fetch('https://axis-calendar-backend.onrender.com/api/v1/trainings', {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
@@ -421,7 +421,7 @@ export default function ReportsDashboard() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`https://axis-calendar-backend-122036974660.us-central1.run.app/api/v1/trainings/${editingTraining.id}`, {
+      const response = await fetch(`https://axis-calendar-backend.onrender.com/api/v1/trainings/${editingTraining.id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(payload),
@@ -485,7 +485,7 @@ export default function ReportsDashboard() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch('https://axis-calendar-backend-122036974660.us-central1.run.app/api/v1/auth/register', {
+      const response = await fetch('https://axis-calendar-backend.onrender.com/api/v1/auth/register', {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
@@ -564,7 +564,7 @@ export default function ReportsDashboard() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`https://axis-calendar-backend-122036974660.us-central1.run.app/api/v1/trainings/${training.id}/attendance`, {
+      const response = await fetch(`https://axis-calendar-backend.onrender.com/api/v1/trainings/${training.id}/attendance`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(payload),
@@ -660,7 +660,7 @@ export default function ReportsDashboard() {
     try {
       // Hit backend API to toggle task state
       if (token && token !== 'mock-jwt-token-xyz') {
-        await fetch(`https://axis-calendar-backend-122036974660.us-central1.run.app/api/v1/trainings/tasks/${taskId}/complete`, {
+        await fetch(`https://axis-calendar-backend.onrender.com/api/v1/trainings/tasks/${taskId}/complete`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

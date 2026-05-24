@@ -26,8 +26,8 @@ export default function LoginScreen() {
     setErrorMsg('');
 
     try {
-      // Hit the live GCP Cloud Run API Gateway directly
-      const response = await fetch('https://axis-calendar-backend-122036974660.us-central1.run.app/api/v1/auth/login', {
+      // Hit the live Render API Gateway directly
+      const response = await fetch('https://axis-calendar-backend.onrender.com/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email_or_id: emailOrId, password }),
