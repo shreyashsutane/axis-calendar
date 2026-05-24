@@ -1,32 +1,36 @@
 import db from '../config/db';
+import { logger } from '../config/logger';
 
-async function runMigration() {
-  console.log('🚀 Starting Database Schema Migration...');
+async function runMigrations() {
+  logger.info('🚀 Database schema migration sequence started...');
+  
   const client = await db.pool.connect();
+  
   try {
     await client.query('BEGIN');
-
-    console.log('Adding latitude and longitude to branches table (if not exists)...');
+    
+    // Execute DDL operations safely
+    logger.info('Applying branches GPS coordinates columns...');
     await client.query(`
       ALTER TABLE branches ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
       ALTER TABLE branches ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
     `);
-
-    console.log('Adding training_type to trainings table (if not exists)...');
+    
+    logger.info('Applying trainings training_type columns...');
     await client.query(`
       ALTER TABLE trainings ADD COLUMN IF NOT EXISTS training_type VARCHAR(10) DEFAULT 'online';
     `);
-
+    
     await client.query('COMMIT');
-    console.log('✅ Database migration successfully completed!');
-  } catch (err) {
+    logger.info('✅ Database schema migrations executed and committed successfully!');
+    process.exit(0);
+  } catch (err: any) {
     await client.query('ROLLBACK');
-    console.error('❌ Database migration failed:', err);
+    logger.error('❌ Database schema migrations sequence failed! Rollback executed.', err);
     process.exit(1);
   } finally {
     client.release();
-    process.exit(0);
   }
 }
 
-runMigration();
+runMigrations();

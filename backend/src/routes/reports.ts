@@ -1,6 +1,6 @@
-import { Router, Response } from 'express';
-import { authenticateToken, requireManager, AuthenticatedRequest } from '../middleware/auth';
-import db from '../config/db';
+import { Router } from 'express';
+import { authenticateToken, requireManager } from '../middleware/auth';
+import { ReportController } from '../controllers/reportController';
 
 const router = Router();
 
@@ -9,224 +9,23 @@ router.use(authenticateToken as any);
 router.use(requireManager as any);
 
 // REPORT 1: GET /api/v1/reports/trainings-summary
-// Aggregates scheduled, rescheduled, and cancelled training counts by date (Year, Month, Day)
-router.get('/trainings-summary', async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const summaryRes = await db.query(`
-      SELECT 
-          EXTRACT(YEAR FROM scheduled_start)::INTEGER AS year,
-          EXTRACT(MONTH FROM scheduled_start)::INTEGER AS month,
-          EXTRACT(DAY FROM scheduled_start)::INTEGER AS day,
-          COUNT(*)::INTEGER AS total,
-          COUNT(CASE WHEN status = 'scheduled' THEN 1 END)::INTEGER AS scheduled,
-          COUNT(CASE WHEN status = 'cancelled' THEN 1 END)::INTEGER AS cancelled,
-          COUNT(CASE WHEN status = 'rescheduled' THEN 1 END)::INTEGER AS rescheduled
-      FROM trainings
-      GROUP BY 
-          EXTRACT(YEAR FROM scheduled_start),
-          EXTRACT(MONTH FROM scheduled_start),
-          EXTRACT(DAY FROM scheduled_start)
-      ORDER BY 
-          year DESC, 
-          month DESC, 
-          day DESC;
-    `);
-
-    return res.status(200).json({
-      success: true,
-      data: summaryRes.rows,
-      meta: { timestamp: new Date().toISOString() }
-    });
-  } catch (err: any) {
-    console.error('Error generating Report 1:', err);
-    return res.status(500).json({ success: false, error: 'Database compilation for Report 1 failed.' });
-  }
-});
+// scheduled, rescheduled, and cancelled training counts by date
+router.get('/trainings-summary', ReportController.getTrainingsSummary as any);
 
 // REPORT 2: GET /api/v1/reports/attendance-metrics
-// Compiles global totals and percentages of each attendance status (Attended, Absent, Excused, Pending)
-router.get('/attendance-metrics', async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    // 2A: Global attendance aggregate rate metrics
-    const globalRes = await db.query(`
-      SELECT 
-          attendance_status AS status,
-          COUNT(*)::INTEGER AS count,
-          ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 2)::FLOAT AS percentage
-      FROM training_attendees
-      GROUP BY attendance_status;
-    `);
-
-    // 2B: Detailed attendance per training session
-    const detailedRes = await db.query(`
-      SELECT 
-          t.id AS training_id,
-          t.title AS training_title,
-          t.scheduled_start AS training_date,
-          t.status AS training_status,
-          COUNT(ta.id)::INTEGER AS total_invited,
-          SUM(CASE WHEN ta.attendance_status = 'attended' THEN 1 ELSE 0 END)::INTEGER AS attended_count,
-          SUM(CASE WHEN ta.attendance_status = 'absent' THEN 1 ELSE 0 END)::INTEGER AS absent_count,
-          SUM(CASE WHEN ta.attendance_status = 'excused' THEN 1 ELSE 0 END)::INTEGER AS excused_count,
-          SUM(CASE WHEN ta.attendance_status = 'pending' THEN 1 ELSE 0 END)::INTEGER AS pending_count,
-          ROUND(
-              100.0 * SUM(CASE WHEN ta.attendance_status = 'attended' THEN 1 ELSE 0 END) / 
-              NULLIF(COUNT(ta.id), 0), 
-              2
-          )::FLOAT AS attendance_rate_percent
-      FROM trainings t
-      LEFT JOIN training_attendees ta ON t.id = ta.training_id
-      GROUP BY t.id, t.title, t.scheduled_start, t.status
-      ORDER BY t.scheduled_start DESC;
-    `);
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        global_summary: globalRes.rows,
-        detailed_sessions: detailedRes.rows,
-      },
-      meta: { timestamp: new Date().toISOString() }
-    });
-  } catch (err: any) {
-    console.error('Error generating Report 2:', err);
-    return res.status(500).json({ success: false, error: 'Database compilation for Report 2 failed.' });
-  }
-});
+// Compiles global totals and detailed attendance per session
+router.get('/attendance-metrics', ReportController.getAttendanceMetrics as any);
 
 // REPORT 3: GET /api/v1/reports/branch-completion
 // Evaluates branches by mapping employee attendance and task completion rates
-router.get('/branch-completion', async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const branchRes = await db.query(`
-      SELECT 
-          b.id AS branch_id,
-          b.branch_code,
-          b.name AS branch_name,
-          COUNT(DISTINCT e.id)::INTEGER AS total_branch_employees,
-          
-          -- Attendance statistics (using NULLIF division-by-zero protection)
-          COUNT(ta.id)::INTEGER AS total_training_invites,
-          SUM(CASE WHEN ta.attendance_status = 'attended' THEN 1 ELSE 0 END)::INTEGER AS total_attended,
-          COALESCE(ROUND(
-              100.0 * SUM(CASE WHEN ta.attendance_status = 'attended' THEN 1 ELSE 0 END) / 
-              NULLIF(COUNT(ta.id), 0), 
-              2
-          ), 0.0)::FLOAT AS branch_attendance_rate_percent,
-          
-          -- Task statistics (using NULLIF division-by-zero protection)
-          COUNT(at.id)::INTEGER AS total_tasks_assigned,
-          SUM(CASE WHEN at.is_completed = TRUE THEN 1 ELSE 0 END)::INTEGER AS total_tasks_completed,
-          COALESCE(ROUND(
-              100.0 * SUM(CASE WHEN at.is_completed = TRUE THEN 1 ELSE 0 END) / 
-              NULLIF(COUNT(at.id), 0), 
-              2
-          ), 0.0)::FLOAT AS branch_task_completion_rate_percent
-      FROM branches b
-      LEFT JOIN employees e ON b.id = e.branch_id
-      LEFT JOIN training_attendees ta ON e.id = ta.employee_id
-      LEFT JOIN attendee_tasks at ON e.id = at.employee_id
-      GROUP BY b.id, b.branch_code, b.name
-      ORDER BY branch_attendance_rate_percent DESC, branch_task_completion_rate_percent DESC;
-    `);
-
-    return res.status(200).json({
-      success: true,
-      data: branchRes.rows,
-      meta: { timestamp: new Date().toISOString() }
-    });
-  } catch (err: any) {
-    console.error('Error generating Report 3:', err);
-    return res.status(500).json({ success: false, error: 'Database compilation for Report 3 failed.' });
-  }
-});
+router.get('/branch-completion', ReportController.getBranchCompletion as any);
 
 // REPORT 4: GET /api/v1/reports/task-completion
 // Measures individual task progress completion rates for each specific training program
-router.get('/task-completion', async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const taskRes = await db.query(`
-      SELECT 
-          t.id AS training_id,
-          t.title AS training_title,
-          t.scheduled_start AS training_date,
-          COUNT(DISTINCT tk.id)::INTEGER AS unique_tasks_created,
-          COUNT(at.id)::INTEGER AS total_individual_assignments,
-          SUM(CASE WHEN at.is_completed = TRUE THEN 1 ELSE 0 END)::INTEGER AS completed_assignments,
-          COALESCE(ROUND(
-              100.0 * SUM(CASE WHEN at.is_completed = TRUE THEN 1 ELSE 0 END) / 
-              NULLIF(COUNT(at.id), 0), 
-              2
-          ), 0.0)::FLOAT AS task_completion_rate_percent
-      FROM trainings t
-      LEFT JOIN tasks tk ON t.id = tk.training_id
-      LEFT JOIN attendee_tasks at ON tk.id = at.task_id
-      GROUP BY t.id, t.title, t.scheduled_start
-      ORDER BY t.scheduled_start DESC;
-    `);
-
-    return res.status(200).json({
-      success: true,
-      data: taskRes.rows,
-      meta: { timestamp: new Date().toISOString() }
-    });
-  } catch (err: any) {
-    console.error('Error generating Report 4:', err);
-    return res.status(500).json({ success: false, error: 'Database compilation for Report 4 failed.' });
-  }
-});
+router.get('/task-completion', ReportController.getTaskCompletion as any);
 
 // REPORT 5: GET /api/v1/reports/team-attendance
-// Fetches trainings scheduled by this manager or their subordinates (other managers in the same branch), including detailed attendee lists and attendance states.
-router.get('/team-attendance', async (req: AuthenticatedRequest, res: Response) => {
-  const managerId = req.user?.id;
-  const branchId = req.user?.branch_id;
-
-  try {
-    // 1. Fetch trainings scheduled by this manager or managers in the same branch
-    const trainingsRes = await db.query(
-      `SELECT t.id, t.title, t.description, t.scheduled_start, t.scheduled_end, t.status, t.training_type,
-              e.first_name AS manager_first, e.last_name AS manager_last,
-              (e.id = $1) AS scheduled_by_self
-       FROM trainings t
-       JOIN employees e ON t.manager_id = e.id
-       WHERE t.manager_id = $1
-          OR (e.role = 'manager' AND e.branch_id = $2)
-       ORDER BY t.scheduled_start DESC`,
-      [managerId, branchId]
-    );
-
-    const trainings = trainingsRes.rows;
-
-    // 2. Fetch attendees and their status for all these trainings
-    const detailedPromises = trainings.map(async (t) => {
-      const attendeesRes = await db.query(
-        `SELECT ta.attendance_status, ta.marked_at,
-                e.first_name, e.last_name, e.employee_id, b.name AS branch_name
-         FROM training_attendees ta
-         JOIN employees e ON ta.employee_id = e.id
-         LEFT JOIN branches b ON e.branch_id = b.id
-         WHERE ta.training_id = $1
-         ORDER BY e.first_name ASC`,
-        [t.id]
-      );
-      return {
-        ...t,
-        attendees: attendeesRes.rows
-      };
-    });
-
-    const detailedTrainings = await Promise.all(detailedPromises);
-
-    return res.status(200).json({
-      success: true,
-      data: detailedTrainings,
-      meta: { count: detailedTrainings.length, timestamp: new Date().toISOString() }
-    });
-  } catch (err: any) {
-    console.error('Error generating Team Attendance Report:', err);
-    return res.status(500).json({ success: false, error: 'Database compilation for Team Attendance Report failed.' });
-  }
-});
+// Detailed attendance rosters for trainings scheduled under this branch manager
+router.get('/team-attendance', ReportController.getTeamAttendance as any);
 
 export default router;
